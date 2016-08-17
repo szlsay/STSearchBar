@@ -64,14 +64,13 @@ NS_ASSUME_NONNULL_END
 }
 
 - (void)setupUI{
-    _prompt = @"";
     _placeholder = @"";
-
+    _showsCancelButton = YES;
+    _placeholderColor = [UIColor colorWithWhite:0.35 alpha:1];
 
     self.frame = CGRectMake(self.frame.origin.x, self.frame.origin.y, self.frame.size.width, STSearchBarHeight);
-    self.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     self.backgroundColor = [UIColor colorWithRed:(201.0/255) green:(201.0/255) blue:(206.0/255) alpha:1];
-
+    self.clipsToBounds = YES;
     [self addSubview:self.buttonCancel];
     [self addSubview:self.textField];
     [self addSubview:self.buttonCenter];
@@ -86,12 +85,14 @@ NS_ASSUME_NONNULL_END
     frameButtonCenter.origin.x = CGRectGetMinX(self.textField.frame);
     [UIView animateWithDuration:0.3 animations:^{
         self.buttonCenter.frame = frameButtonCenter;
-        self.buttonCancel.frame = CGRectMake(self.frame.size.width - 60, 0, 60, STSearchBarHeight);
-        self.textField.frame = CGRectMake(STSearchBarMargin, STSearchBarMargin, self.buttonCancel.frame.origin.x-STSearchBarMargin, STTextFieldHeight);
+        if (self.showsCancelButton) {
+            self.buttonCancel.frame = CGRectMake(self.frame.size.width - 60, 0, 60, STSearchBarHeight);
+            self.textField.frame = CGRectMake(STSearchBarMargin, STSearchBarMargin, self.buttonCancel.frame.origin.x-STSearchBarMargin, STTextFieldHeight);
+        }
     } completion:^(BOOL finished) {
         [self.buttonCenter setHidden:YES];
         [self.imageIcon setHidden:NO];
-        self.textField.placeholder = self.placeholder;
+        self.textField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:self.placeholder attributes:@{NSForegroundColorAttributeName:self.placeholderColor}];
     }];
 
     if (self.delegate && [self.delegate respondsToSelector:@selector(searchBarShouldBeginEditing:)])
@@ -119,11 +120,13 @@ NS_ASSUME_NONNULL_END
 {
     [self.buttonCenter setHidden:NO];
     [self.imageIcon setHidden:YES];
-    self.textField.placeholder = @"";
+    self.textField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"" attributes:@{NSForegroundColorAttributeName:self.placeholderColor}];
     [UIView animateWithDuration:0.3 animations:^{
+        if (self.showsCancelButton) {
+            self.buttonCancel.frame = CGRectMake(self.frame.size.width, 0, 60, STSearchBarHeight);
+            self.textField.frame = CGRectMake(STSearchBarMargin, STSearchBarMargin, self.frame.size.width-STSearchBarMargin*2, STTextFieldHeight);
+        }
         self.buttonCenter.center = self.textField.center;
-        self.buttonCancel.frame = CGRectMake(self.frame.size.width, 0, 60, STSearchBarHeight);
-        self.textField.frame = CGRectMake(STSearchBarMargin, STSearchBarMargin, self.frame.size.width-STSearchBarMargin*2, STTextFieldHeight);
     } completion:^(BOOL finished) {
 
     }];
@@ -132,6 +135,8 @@ NS_ASSUME_NONNULL_END
     {
         [self.delegate searchBarTextDidEndEditing:self];
     }
+
+    self.textField.text = @"";
 }
 -(void)textFieldDidChange:(UITextField *)textField
 {
@@ -163,9 +168,10 @@ NS_ASSUME_NONNULL_END
     }
     return YES;
 }
+
 - (BOOL)textFieldShouldReturn:(UITextField *)textField
 {
-    [_textField resignFirstResponder];
+    [textField resignFirstResponder];
     if (self.delegate && [self.delegate respondsToSelector:@selector(searchBarSearchButtonClicked:)])
     {
         [self.delegate searchBarSearchButtonClicked:self];
@@ -173,7 +179,6 @@ NS_ASSUME_NONNULL_END
     return YES;
 }
 #pragma mark - --- 3. event response 事件相应 ---
-
 -(void)cancelButtonTouched
 {
     self.textField.text = @"";
@@ -184,7 +189,15 @@ NS_ASSUME_NONNULL_END
     }
 }
 #pragma mark - --- 4. private methods 私有方法 ---
+- (BOOL)becomeFirstResponder
+{
+    return [self.textField becomeFirstResponder];
+}
 
+- (BOOL)resignFirstResponder
+{
+    return [self.textField resignFirstResponder];
+}
 #pragma mark - --- 5. setters 属性 ---
 - (void)setPlaceholder:(NSString *)placeholder
 {
@@ -194,20 +207,49 @@ NS_ASSUME_NONNULL_END
     self.buttonCenter.center = self.textField.center;
 }
 
+- (void)setText:(NSString *)text
+{
+    self.textField.text = text?:@"";
+    if (text.length > 0) {
+        [self textFieldShouldBeginEditing:self.textField];
+    }
+}
+
+- (void)setInputAccessoryView:(UIView *)inputAccessoryView
+{
+    _inputAccessoryView = inputAccessoryView;
+    self.textField.inputAccessoryView = inputAccessoryView;
+}
+
+- (void)setTextColor:(UIColor *)textColor
+{
+    _textColor = textColor;
+    self.textField.textColor = textColor;
+}
+
+- (void)setPlaceholderColor:(UIColor *)placeholderColor
+{
+    _placeholderColor = placeholderColor;
+    NSAssert(_placeholder, @"Please set placeholder before setting placeholdercolor");
+    self.textField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:self.placeholder attributes:@{NSForegroundColorAttributeName:placeholderColor}];
+    [self.buttonCenter setTitleColor:placeholderColor forState:UIControlStateNormal];
+}
+
+- (void)setFont:(UIFont *)font
+{
+    _font = font;
+    self.textField.font = font;
+    self.buttonCenter.titleLabel.font = font;
+    [self.buttonCenter sizeToFit];
+}
+
+#pragma mark - --- 6. getters 属性 —
+
 - (NSString *)text
 {
     return self.textField.text;
 }
 
-- (void)setText:(NSString *)text
-{
-    self.textField.text = text?:@"";
-    if (text.length > 0) {
-//        [self textFieldShouldBeginEditing:self.textField];
-        [self.textField becomeFirstResponder];
-    }
-}
-#pragma mark - --- 6. getters 属性 —
 - (UITextField *)textField
 {
     if (!_textField) {
@@ -229,10 +271,9 @@ NS_ASSUME_NONNULL_END
         textField.layer.borderColor = [[UIColor colorWithWhite:0.783 alpha:1.000] CGColor];
         textField.layer.borderWidth= 0.5f;
         textField.backgroundColor = [UIColor whiteColor];
-
         [textField setLeftViewMode:UITextFieldViewModeAlways];
         textField.leftView = self.imageIcon;
-
+        [textField setClipsToBounds:YES];
         _textField = textField;
 
     }
